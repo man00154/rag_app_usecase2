@@ -1,6 +1,6 @@
 streamlit
-langchain==0.2.12
-langchain-community==0.2.12
+langchain
+langchain-community
 pypdf
 beautifulsoup4
 requests
