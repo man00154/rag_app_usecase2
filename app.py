@@ -7,7 +7,7 @@ from langchain.chat_models import ChatOpenAI
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
 
-st.title("RAG Application with PDF + Links")
+st.title("MANISH SINGH RAG Application with PDF + Links")
 
 st.markdown("### Step 1: Download and index official PDFs and pages")
 if st.button("Download & Index Data"):
