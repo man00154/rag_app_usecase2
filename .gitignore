@@ -205,3 +205,24 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environment files
+.env
+venv/
+env/
+.venv/
+
+# VSCode settings
+.vscode/
+
+# MacOS
+.DS_Store
+
+# Data and vectorstore (optional - you can keep if you want)
+sample_data/
+html_data/
+vectorstore/
