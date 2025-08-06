@@ -5,7 +5,7 @@ pypdf==4.2.0
 beautifulsoup4==4.12.3
 requests==2.31.0
 tiktoken==0.6.0
-openai==1.35.13
+openai==1.99.1
 faiss-cpu==1.7.4
-langchain-openai==1.35.13
+langchain-openai==0.3.28
 
