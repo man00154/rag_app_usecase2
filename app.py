@@ -1,8 +1,13 @@
+import os
 import streamlit as st
 from utils import *
 from langchain.chains import ConversationalRetrievalChain
 from langchain.chat_models import ChatOpenAI
+import fitz  # PyMuPDF
 
+# Ensure data folders exist before accessing
+os.makedirs("sample_data", exist_ok=True)
+os.makedirs("html_data", exist_ok=True)
 
 # Initialize session state for chat history
 if "chat_history" not in st.session_state:
@@ -12,7 +17,7 @@ st.title("MANISH SINGH RAG Application with PDF + Links")
 
 st.markdown("### Step 1: Download and index official PDFs and pages")
 if st.button("Download & Index Data"):
-    ensure_data()
+    ensure_data()  # downloads and saves PDFs and HTML text files
     pdf_docs = load_pdfs_from_folder("sample_data")
     html_docs = load_html_from_folder("html_data")
     create_vectorstore(pdf_docs, html_docs)
@@ -23,9 +28,10 @@ uploaded_files = st.file_uploader("Upload multiple PDFs", accept_multiple_files=
 user_docs = []
 if uploaded_files:
     for file in uploaded_files:
-        with open(f"temp_{file.name}", "wb") as f:
+        temp_path = f"temp_{file.name}"
+        with open(temp_path, "wb") as f:
             f.write(file.getbuffer())
-        loader = PyPDFLoader(f"temp_{file.name}")
+        loader = PyPDFLoader(temp_path)
         user_docs.extend(loader.load())
 
 if st.button("Add uploaded PDFs to index"):
@@ -57,13 +63,24 @@ if query:
         st.markdown(f"**A{i+1}:** {a}")
 
 st.markdown("### Step 4: View indexed PDFs")
-import fitz  # PyMuPDF
-pdf_files = [f for f in os.listdir("sample_data") if f.endswith(".pdf")]
-selected_pdf = st.selectbox("Choose a PDF to view", pdf_files)
-if selected_pdf:
-    pdf_path = os.path.join("sample_data", selected_pdf)
-    doc = fitz.open(pdf_path)
-    page = doc.load_page(0)
-    pix = page.get_pixmap()
-    img_bytes = pix.tobytes("png")
-    st.image(img_bytes)
+
+# Safely get list of PDFs; if none, show message
+pdf_files = []
+if os.path.exists("sample_data"):
+    pdf_files = [f for f in os.listdir("sample_data") if f.endswith(".pdf")]
+
+if pdf_files:
+    selected_pdf = st.selectbox("Choose a PDF to view", pdf_files)
+    if selected_pdf:
+        pdf_path = os.path.join("sample_data", selected_pdf)
+        try:
+            doc = fitz.open(pdf_path)
+            page = doc.load_page(0)
+            pix = page.get_pixmap()
+            img_bytes = pix.tobytes("png")
+            st.image(img_bytes)
+        except Exception as e:
+            st.error(f"Error loading PDF: {e}")
+else:
+    st.info("No PDFs found in sample_data folder. Please download data first.")
+
