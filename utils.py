@@ -74,7 +74,7 @@ def ensure_data():
 
     # Download PDFs
     for name, url in PDF_LINKS.items():
-        path = os.path.join("sample_data", name.replace(" ", "_") + ".pdf")
+        path = os.path.join("sample_data", f"{name}.pdf")
         if not os.path.exists(path):
             try:
                 r = requests.get(url, timeout=30)
@@ -84,9 +84,9 @@ def ensure_data():
             except Exception as e:
                 print(f"Failed PDF: {name} — {e}")
 
-    # Download HTML and save as text
+    # Download HTML
     for name, url in HTML_LINKS.items():
-        path = os.path.join("html_data", name.replace(" ", "_") + ".txt")
+        path = os.path.join("html_data", f"{name}.txt")
         if not os.path.exists(path):
             try:
                 r = requests.get(url, timeout=30)
