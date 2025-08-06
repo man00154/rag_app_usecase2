@@ -1,11 +1,8 @@
 streamlit
 langchain
 langchain-community
-pypdf
-beautifulsoup4
-requests
-tiktoken
-openai
+langchain-openai
 faiss-cpu
-PyMuPDF
-
+PyPDF2
+tiktoken
+requests
