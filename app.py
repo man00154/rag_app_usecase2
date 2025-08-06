@@ -1,86 +1,111 @@
 import os
 import streamlit as st
-from utils import *
+import requests
+from utils import load_pdf_and_split, get_embeddings, create_vectorstore, download_pdf_from_url
 from langchain.chains import ConversationalRetrievalChain
 from langchain.chat_models import ChatOpenAI
-import fitz  # PyMuPDF
 
-# Ensure data folders exist before accessing
-os.makedirs("sample_data", exist_ok=True)
-os.makedirs("html_data", exist_ok=True)
-
-# Initialize session state for chat history
+# -----------------------------
+# Initialize session state
+# -----------------------------
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
 
-st.title("MANISH SINGH RAG Application with PDF + Links")
+st.title("📄 MANISH SINGH RAG Application with PDF + Links")
+st.markdown("Upload PDFs, paste PDF links, or use existing ones in `sample_data`, then ask questions about them.")
 
-st.markdown("### Step 1: Download and index official PDFs and pages")
-if st.button("Download & Index Data"):
-    ensure_data()  # downloads and saves PDFs and HTML text files
-    pdf_docs = load_pdfs_from_folder("sample_data")
-    html_docs = load_html_from_folder("html_data")
-    create_vectorstore(pdf_docs, html_docs)
-    st.success("Data downloaded and indexed.")
+# -----------------------------
+# Ensure sample_data folder exists
+# -----------------------------
+pdf_folder = "sample_data"
+if not os.path.exists(pdf_folder):
+    os.makedirs(pdf_folder)
+    st.warning(f"📂 Created folder '{pdf_folder}'. You can upload or link PDFs now.")
 
-st.markdown("### Step 2: Upload your own PDFs (optional)")
-uploaded_files = st.file_uploader("Upload multiple PDFs", accept_multiple_files=True, type=["pdf"])
-user_docs = []
+# -----------------------------
+# 1. Upload PDFs
+# -----------------------------
+st.markdown("### 📂 Step 1: Add Your PDFs")
+uploaded_files = st.file_uploader(
+    "Upload one or more PDF files",
+    type=["pdf"],
+    accept_multiple_files=True
+)
+
 if uploaded_files:
-    for file in uploaded_files:
-        temp_path = f"temp_{file.name}"
-        with open(temp_path, "wb") as f:
-            f.write(file.getbuffer())
-        loader = PyPDFLoader(temp_path)
-        user_docs.extend(loader.load())
+    for uploaded_file in uploaded_files:
+        save_path = os.path.join(pdf_folder, uploaded_file.name)
+        with open(save_path, "wb") as f:
+            f.write(uploaded_file.getbuffer())
+    st.success(f"✅ Uploaded and saved {len(uploaded_files)} PDF(s) to '{pdf_folder}'.")
 
-if st.button("Add uploaded PDFs to index"):
-    if user_docs:
-        vectorstore = load_vectorstore()
-        embeddings = OpenAIEmbeddings()
-        splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
-        split_user_docs = splitter.split_documents(user_docs)
-        vectorstore.add_documents(split_user_docs)
-        vectorstore.save_local("vectorstore")
-        st.success("Uploaded PDFs added to index.")
-    else:
-        st.warning("Upload PDFs first.")
+# -----------------------------
+# 2. Add PDFs from URLs
+# -----------------------------
+st.markdown("### 🌐 Step 2: Add PDFs via URL")
+pdf_url = st.text_input("Enter PDF URL (e.g., https://example.com/file.pdf)")
 
-st.markdown("### Step 3: Query the knowledge base")
-query = st.text_input("Enter your question here:")
-if query:
-    vectorstore = load_vectorstore()
-    llm = ChatOpenAI(temperature=0)
-    qa_chain = ConversationalRetrievalChain.from_llm(llm, vectorstore.as_retriever())
-    result = qa_chain({"question": query, "chat_history": st.session_state.chat_history})
-    st.session_state.chat_history.append((query, result["answer"]))
-    st.write("**Answer:**")
-    st.write(result["answer"])
-
-    st.markdown("### Chat history")
-    for i, (q, a) in enumerate(st.session_state.chat_history):
-        st.markdown(f"**Q{i+1}:** {q}")
-        st.markdown(f"**A{i+1}:** {a}")
-
-st.markdown("### Step 4: View indexed PDFs")
-
-# Safely get list of PDFs; if none, show message
-pdf_files = []
-if os.path.exists("sample_data"):
-    pdf_files = [f for f in os.listdir("sample_data") if f.endswith(".pdf")]
-
-if pdf_files:
-    selected_pdf = st.selectbox("Choose a PDF to view", pdf_files)
-    if selected_pdf:
-        pdf_path = os.path.join("sample_data", selected_pdf)
+if st.button("Download PDF from URL"):
+    if pdf_url.lower().endswith(".pdf"):
         try:
-            doc = fitz.open(pdf_path)
-            page = doc.load_page(0)
-            pix = page.get_pixmap()
-            img_bytes = pix.tobytes("png")
-            st.image(img_bytes)
+            filename = download_pdf_from_url(pdf_url, pdf_folder)
+            st.success(f"✅ Downloaded PDF from URL and saved as '{filename}'.")
         except Exception as e:
-            st.error(f"Error loading PDF: {e}")
-else:
-    st.info("No PDFs found in sample_data folder. Please download data first.")
+            st.error(f"❌ Error downloading PDF: {e}")
+    else:
+        st.error("URL must end with `.pdf`")
 
+# -----------------------------
+# 3. Load all PDFs from folder
+# -----------------------------
+pdf_files = [f for f in os.listdir(pdf_folder) if f.lower().endswith(".pdf")]
+
+if not pdf_files:
+    st.error("❌ No PDFs found. Please upload files or provide links to continue.")
+    st.stop()
+else:
+    st.success(f"📄 Found {len(pdf_files)} PDF(s): {pdf_files}")
+
+# -----------------------------
+# 4. Process PDFs
+# -----------------------------
+docs = []
+for pdf in pdf_files:
+    pdf_path = os.path.join(pdf_folder, pdf)
+    docs.extend(load_pdf_and_split(pdf_path))
+
+# -----------------------------
+# 5. Create Vectorstore + Retriever
+# -----------------------------
+embeddings = get_embeddings()
+vectorstore = create_vectorstore(docs, embeddings)
+retriever = vectorstore.as_retriever()
+
+# -----------------------------
+# 6. Create QA Chain
+# -----------------------------
+llm = ChatOpenAI(model="gpt-3.5-turbo", temperature=0)
+qa_chain = ConversationalRetrievalChain.from_llm(llm, retriever=retriever)
+
+# -----------------------------
+# 7. Chat Interface
+# -----------------------------
+st.markdown("### 💬 Step 3: Ask questions about your documents")
+user_question = st.text_input("Enter your question:")
+
+if user_question:
+    result = qa_chain({
+        "question": user_question,
+        "chat_history": st.session_state.chat_history
+    })
+    st.session_state.chat_history.append((user_question, result["answer"]))
+    st.markdown(f"**Answer:** {result['answer']}")
+
+# -----------------------------
+# 8. Show Chat History
+# -----------------------------
+if st.session_state.chat_history:
+    st.markdown("### 📜 Chat History")
+    for q, a in st.session_state.chat_history:
+        st.markdown(f"**Q:** {q}")
+        st.markdown(f"**A:** {a}")
