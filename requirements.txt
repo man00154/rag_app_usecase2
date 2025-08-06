@@ -7,3 +7,5 @@ requests==2.31.0
 tiktoken==0.6.0
 openai==1.35.13
 faiss-cpu==1.7.4
+langchain-openai==0.0.8
+
